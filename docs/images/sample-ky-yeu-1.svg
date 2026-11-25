@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 540" width="800" height="540">
+  <rect width="800" height="540" fill="#1d4ed8"/>
+  <rect width="800" height="540" fill="#0f172a" fill-opacity="0.35"/>
+  <g stroke="#f7f3ea" stroke-opacity="0.22" fill="none" stroke-width="1.5">
+    <line x1="0" y1="180" x2="800" y2="180"/>
+    <line x1="0" y1="360" x2="800" y2="360"/>
+    <line x1="266" y1="0" x2="266" y2="540"/>
+    <line x1="533" y1="0" x2="533" y2="540"/>
+  </g>
+  <text x="56" y="84" font-family="monospace" font-size="16" fill="#d9f99d" letter-spacing="2">CUỘN PHIM 12H · 01</text>
+  <text x="56" y="420" font-family="Georgia, serif" font-style="italic" font-size="44" fill="#f7f3ea">Ảnh tập thể sân trường</text>
+  <text x="56" y="464" font-family="monospace" font-size="15" fill="rgba(247,243,234,0.75)">ẢNH MẪU — THAY BẰNG ẢNH KỶ YẾU THẬT CỦA LỚP</text>
+</svg>

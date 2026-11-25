@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import type {
   AuthRole,
@@ -17,6 +17,7 @@ import {
   updatePostAdmin,
   updateSiteSettingsAdmin
 } from './lib/store';
+import { GitHubAuthError } from './lib/githubApi';
 import { Masthead } from './components/Masthead';
 import { HeroCover } from './components/HeroCover';
 import { GradeTabs, type TagFilter } from './components/GradeTabs';
@@ -60,6 +61,19 @@ export function App() {
     post: null
   });
   const [banner, setBanner] = useState<string | null>(null);
+  const [mediaPreviews, setMediaPreviews] = useState<Record<string, string>>({});
+  const previewsRef = useRef<Record<string, string>>({});
+  previewsRef.current = mediaPreviews;
+
+  useEffect(() => {
+    return () => {
+      for (const url of Object.values(previewsRef.current)) {
+        if (url.startsWith('blob:') && typeof URL.revokeObjectURL === 'function') {
+          URL.revokeObjectURL(url);
+        }
+      }
+    };
+  }, []);
 
   useEffect(() => {
     function onHashChange() {
@@ -78,6 +92,10 @@ export function App() {
         if (!active) return;
         setSite(res.site);
         setPosts(res.posts);
+        if (res.authExpired) {
+          sessionStorage.removeItem(SESSION_KEY);
+          setSession(null);
+        }
       })
       .catch((err) => {
         if (!active) return;
@@ -93,10 +111,23 @@ export function App() {
 
   const role: AuthRole = session?.role ?? 'public';
 
-  const visiblePosts = useMemo(
-    () => (role === 'admin' ? posts : posts.filter((p) => !p.hidden)),
-    [posts, role]
-  );
+  const resolvedSite = useMemo<SiteSettings | null>(() => {
+    if (!site) return null;
+    const previewHero = mediaPreviews[site.heroImage];
+    return previewHero ? { ...site, heroImage: previewHero } : site;
+  }, [site, mediaPreviews]);
+
+  const visiblePosts = useMemo(() => {
+    const base = role === 'admin' ? posts : posts.filter((p) => !p.hidden);
+    if (Object.keys(mediaPreviews).length === 0) return base;
+    return base.map((p) => ({
+      ...p,
+      media: p.media.map((m) => ({
+        ...m,
+        url: mediaPreviews[m.url] ?? m.url
+      }))
+    }));
+  }, [posts, role, mediaPreviews]);
 
   const gradeCounts = useMemo<Record<Grade, number>>(() => {
     const counts: Record<Grade, number> = { 10: 0, 11: 0, 12: 0 };
@@ -130,17 +161,32 @@ export function App() {
     setBanner(msg);
   }
 
+  function registerPreview(relUrl: string, localUrl: string) {
+    setMediaPreviews((prev) => ({ ...prev, [relUrl]: localUrl }));
+  }
+
+  function handleMutationError(err: unknown): never {
+    if (err instanceof GitHubAuthError) {
+      saveSession(null);
+    }
+    throw err;
+  }
+
   async function handleCreatePost(input: DraftPostInput, onProgress: (pct: number) => void) {
     if (!site || !session) return;
-    const updated = await createPost(input, site, session, onProgress);
-    setPosts(updated);
-    setActiveGrade(input.grade);
-    setActiveTag('ALL');
-    showNotice(
-      session.mode === 'github'
-        ? 'Đã đăng bài lên GitHub — trang công khai sẽ tự cập nhật sau khoảng 30 giây.'
-        : 'Đã đăng bài trong chế độ thử cục bộ trên máy này.'
-    );
+    try {
+      const updated = await createPost(input, site, session, onProgress, registerPreview);
+      setPosts(updated);
+      setActiveGrade(input.grade);
+      setActiveTag('ALL');
+      showNotice(
+        session.mode === 'github'
+          ? 'Đã đăng bài lên GitHub — trang công khai sẽ tự cập nhật sau khoảng 30 giây.'
+          : 'Đã đăng bài trong chế độ thử cục bộ trên máy này.'
+      );
+    } catch (err) {
+      handleMutationError(err);
+    }
   }
 
   async function handleUpdatePost(
@@ -148,24 +194,32 @@ export function App() {
     patch: Partial<Pick<Post, 'grade' | 'tag' | 'hidden' | 'media' | 'isSpoiler'>>
   ) {
     if (!site || !session) return;
-    const updated = await updatePostAdmin(postId, patch, site, session);
-    setPosts(updated);
-    showNotice(
-      session.mode === 'github'
-        ? 'Đã cập nhật bài viết lên GitHub.'
-        : 'Đã cập nhật bài viết cục bộ.'
-    );
+    try {
+      const updated = await updatePostAdmin(postId, patch, site, session);
+      setPosts(updated);
+      showNotice(
+        session.mode === 'github'
+          ? 'Đã cập nhật bài viết lên GitHub.'
+          : 'Đã cập nhật bài viết cục bộ.'
+      );
+    } catch (err) {
+      handleMutationError(err);
+    }
   }
 
   async function handleDeletePost(postId: string) {
     if (!site || !session) return;
-    const updated = await deletePostAdmin(postId, site, session);
-    setPosts(updated);
-    showNotice(
-      session.mode === 'github'
-        ? 'Đã xóa bài viết khỏi kho GitHub.'
-        : 'Đã xóa bài viết cục bộ.'
-    );
+    try {
+      const updated = await deletePostAdmin(postId, site, session);
+      setPosts(updated);
+      showNotice(
+        session.mode === 'github'
+          ? 'Đã xóa bài viết khỏi kho GitHub.'
+          : 'Đã xóa bài viết cục bộ.'
+      );
+    } catch (err) {
+      handleMutationError(err);
+    }
   }
 
   async function handleUpdateSite(
@@ -173,13 +227,17 @@ export function App() {
     heroFile?: File
   ) {
     if (!site || !session) return;
-    const updated = await updateSiteSettingsAdmin(patch, site, session, heroFile);
-    setSite(updated);
-    showNotice(
-      session.mode === 'github'
-        ? 'Đã lưu cài đặt trang lên GitHub.'
-        : 'Đã lưu cài đặt trang cục bộ.'
-    );
+    try {
+      const updated = await updateSiteSettingsAdmin(patch, site, session, heroFile, registerPreview);
+      setSite(updated);
+      showNotice(
+        session.mode === 'github'
+          ? 'Đã lưu cài đặt trang lên GitHub.'
+          : 'Đã lưu cài đặt trang cục bộ.'
+      );
+    } catch (err) {
+      handleMutationError(err);
+    }
   }
 
   if (loading && !site) {
@@ -263,7 +321,7 @@ export function App() {
 
       <main className="zine-page">
         <Masthead title={site.title} cohort={site.cohort} />
-        <HeroCover site={site} />
+        <HeroCover site={resolvedSite || site} />
 
         {banner && session && (
           <div className="field-notice" role="status">

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { motion } from 'framer-motion';
 import type { Grade, MediaItem, Post, PostTag, SiteSettings, StorageMode } from '../types/zine';
 import { sha256Hex, verifyPasscode } from '../lib/crypto';
-import { validateMediaFiles } from '../lib/media';
+import { validateHeroImageFile } from '../lib/media';
 
 interface AdminSettingsModalProps {
   site: SiteSettings;
@@ -217,7 +217,16 @@ export function AdminSettingsModal({
                         type="button"
                         className="preview-remove"
                         aria-label={`Xóa tệp ${item.id}`}
-                        onClick={() => setMedia((prev) => prev.filter((m) => m.id !== item.id))}
+                        onClick={() => {
+                          if (!editingPost.body.trim() && media.length <= 1) {
+                            setError(
+                              'Bài viết không có chữ phải giữ lại ít nhất 1 ảnh/video (hoặc hãy xóa hẳn bài).'
+                            );
+                            return;
+                          }
+                          setError(null);
+                          setMedia((prev) => prev.filter((m) => m.id !== item.id));
+                        }}
                       >
                         X
                       </button>
@@ -268,13 +277,13 @@ export function AdminSettingsModal({
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (!f) return;
-                  const res = validateMediaFiles([f]);
-                  if (res.errors.length > 0) {
-                    setError(res.errors[0]);
+                  const heroErr = validateHeroImageFile(f);
+                  if (heroErr) {
+                    setError(heroErr);
                     setHeroFile(undefined);
                   } else {
                     setError(null);
-                    setHeroFile(res.valid[0]);
+                    setHeroFile(f);
                   }
                 }}
               />

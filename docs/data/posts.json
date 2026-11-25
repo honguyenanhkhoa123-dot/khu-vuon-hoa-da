@@ -1,0 +1,66 @@
+[
+  {
+    "id": "post-12-ky-yeu",
+    "grade": 12,
+    "authorName": "Quang Minh",
+    "momentLabel": "Chụp kỷ yếu · Tháng 11",
+    "tag": "Ảnh lớp",
+    "body": "Một buổi chiều nắng gắt ở sân trường và phòng thực hành, cả lớp ráng giữ mặt nghiêm túc đúng năm giây trước khi phá lên cười. Bấm vào từng tấm ảnh để mở chế độ xem toàn màn hình trượt ngang.",
+    "isSpoiler": false,
+    "createdAt": "2026-11-20T09:30:00.000Z",
+    "media": [
+      {
+        "id": "m-ky-1",
+        "type": "image",
+        "url": "./images/sample-ky-yeu-1.svg",
+        "alt": "Ảnh tập thể sân trường lớp 12 Chuyên Hóa"
+      },
+      {
+        "id": "m-ky-2",
+        "type": "image",
+        "url": "./images/sample-ky-yeu-2.svg",
+        "alt": "Góc bàn thí nghiệm quen thuộc lớp 12 Chuyên Hóa"
+      }
+    ]
+  },
+  {
+    "id": "post-12-diem-do",
+    "grade": 12,
+    "authorName": "Linh Chi",
+    "momentLabel": "Giữa kỳ I · Lớp 12",
+    "tag": "Điểm đồ",
+    "body": "Đề kiểm tra 15 phút Hữu cơ bất ngờ làm cả lớp đứng hình hóa đá đúng năm phút đầu, vậy mà cuối kỳ lại kéo lên một loạt điểm chín, điểm mười. Đúng chất phản ứng thu nhiệt trước rồi tỏa nhiệt sau.",
+    "isSpoiler": false,
+    "createdAt": "2026-11-12T14:15:00.000Z",
+    "media": []
+  },
+  {
+    "id": "post-12-nghich-pha",
+    "grade": 12,
+    "authorName": "Khánh",
+    "momentLabel": "Giờ thực hành · Lớp 12",
+    "tag": "Nghịch phá",
+    "body": "Bắt quả tang nguyên tổ 3 tranh thủ gục đầu ngủ sau lưng tủ hóa chất trong lúc chờ kết tủa. Ảnh đã bật lớp che niêm phong — bấm vào để bóc.",
+    "isSpoiler": true,
+    "createdAt": "2026-11-05T08:00:00.000Z",
+    "media": [
+      {
+        "id": "m-np-1",
+        "type": "image",
+        "url": "./images/sample-nghich-pha.svg",
+        "alt": "Hiện trường tổ 3 ngủ gật trong giờ thực hành"
+      }
+    ]
+  },
+  {
+    "id": "post-11-hoi-trai",
+    "grade": 11,
+    "authorName": "Thảo",
+    "momentLabel": "Hội trại 26/3 · Lớp 11",
+    "tag": "Sự kiện",
+    "body": "Hồi năm 11 dựng trại tới 11 giờ đêm mới xong, trời mưa lất phất mà cả đám vẫn ráng giữ bếp than nướng đồ ăn cho bằng được. Còn thiếu khá nhiều ảnh năm 10 và 11 — ai còn giữ cứ gửi đội biên tập đăng thêm lên đây.",
+    "isSpoiler": false,
+    "createdAt": "2025-03-27T11:00:00.000Z",
+    "media": []
+  }
+]

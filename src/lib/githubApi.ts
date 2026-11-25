@@ -4,6 +4,13 @@ export interface RepoConfig {
   branch: string;
 }
 
+export class GitHubAuthError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GitHubAuthError';
+  }
+}
+
 export function encodeUtf8Base64(text: string): string {
   const bytes = new TextEncoder().encode(text);
   const chunkSize = 0x8000;
@@ -61,10 +68,10 @@ export async function verifyRepoToken(
   const repoInfo = (await res.json()) as {
     permissions?: { push?: boolean; admin?: boolean };
   };
-  if (repoInfo.permissions && !repoInfo.permissions.push && !repoInfo.permissions.admin) {
+  if (!repoInfo.permissions?.push && !repoInfo.permissions?.admin) {
     return {
       ok: false,
-      error: 'Token chỉ có quyền đọc — cần cấp quyền Contents: Read and Write cho kho này.'
+      error: 'Token chưa có quyền ghi (Contents: Read and Write) cho kho lưu trữ này.'
     };
   }
 
@@ -97,7 +104,7 @@ export async function readJsonFile<T>(
   });
 
   if (res.status === 401 || res.status === 403) {
-    throw new Error('Phiên Token GitHub đã hết hạn hoặc bị thu hồi.');
+    throw new GitHubAuthError('Phiên Token GitHub đã hết hạn hoặc bị thu hồi.');
   }
   if (!res.ok) {
     throw new Error(`Không đọc được tệp ${repoPath} từ GitHub (mã ${res.status}).`);
@@ -113,23 +120,38 @@ export async function uploadBinaryFile(
   token: string,
   repoPath: string,
   base64: string,
-  message: string
+  message: string,
+  maxRetries = 3
 ): Promise<void> {
   const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${repoPath}`;
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: githubHeaders(token),
-    body: JSON.stringify({
-      message,
-      content: base64,
-      branch: cfg.branch
-    })
-  });
 
-  if (res.status === 401 || res.status === 403) {
-    throw new Error('Token GitHub không đủ quyền tải tệp lên kho lưu trữ.');
-  }
-  if (!res.ok) {
+  for (let attempt = 0; attempt < maxRetries; attempt += 1) {
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: githubHeaders(token),
+      body: JSON.stringify({
+        message,
+        content: base64,
+        branch: cfg.branch
+      })
+    });
+
+    if (res.ok) {
+      return;
+    }
+
+    if (res.status === 409 && attempt < maxRetries - 1) {
+      continue;
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      throw new GitHubAuthError('Token GitHub không đủ quyền tải tệp lên kho lưu trữ.');
+    }
+
+    if (res.status === 409) {
+      throw new Error('Kho đang có người khác đăng tệp cùng lúc, vui lòng thử lại.');
+    }
+
     throw new Error(`Tải tệp ${repoPath} thất bại (mã ${res.status}).`);
   }
 }
@@ -164,12 +186,15 @@ export async function updateJsonFileWithRetry<T>(
       return nextData;
     }
 
-    if ((putRes.status === 409 || putRes.status === 422) && attempt < maxRetries - 1) {
-      continue;
+    if (putRes.status === 409 || putRes.status === 422) {
+      if (attempt < maxRetries - 1) {
+        continue;
+      }
+      throw new Error('Dữ liệu đang được người khác cập nhật cùng lúc, vui lòng thử lại.');
     }
 
     if (putRes.status === 401 || putRes.status === 403) {
-      throw new Error('Token GitHub không hợp lệ hoặc đã bị thu hồi.');
+      throw new GitHubAuthError('Token GitHub không hợp lệ hoặc đã bị thu hồi.');
     }
 
     throw new Error(`Không lưu được ${repoPath} lên GitHub (mã ${putRes.status}).`);

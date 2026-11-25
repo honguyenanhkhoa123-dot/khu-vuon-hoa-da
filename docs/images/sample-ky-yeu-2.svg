@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 540" width="800" height="540">
+  <rect width="800" height="540" fill="#134e4a"/>
+  <g transform="translate(600 200)" stroke="#d9f99d" stroke-opacity="0.4" fill="none" stroke-width="2">
+    <path d="M -25 -95 L 25 -95 L 25 -20 L 85 85 L -85 85 L -25 -20 Z"/>
+    <line x1="-58" y1="38" x2="58" y2="38" stroke-dasharray="6 5"/>
+  </g>
+  <text x="56" y="84" font-family="monospace" font-size="16" fill="#d9f99d" letter-spacing="2">PHÒNG THÍ NGHIỆM · 02</text>
+  <text x="56" y="420" font-family="Georgia, serif" font-style="italic" font-size="44" fill="#f7f3ea">Góc bàn thí nghiệm quen thuộc</text>
+  <text x="56" y="464" font-family="monospace" font-size="15" fill="rgba(247,243,234,0.75)">LỚP 12 CHUYÊN HÓA</text>
+</svg>

@@ -27,6 +27,16 @@ export function isVideoFile(file: File): boolean {
   return VIDEO_TYPES.has(file.type) || (!file.type && VIDEO_EXT_RE.test(file.name));
 }
 
+export function validateHeroImageFile(file: File): string | null {
+  if (!isImageFile(file)) {
+    return 'Ảnh bìa chỉ hỗ trợ tệp hình ảnh (JPG/PNG/WebP), không hỗ trợ video.';
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    return 'Ảnh bìa vượt quá giới hạn 15MB.';
+  }
+  return null;
+}
+
 export function validateMediaFiles(files: File[]): { valid: File[]; errors: string[] } {
   const valid: File[] = [];
   const errors: string[] = [];
@@ -62,9 +72,9 @@ export async function compressImageFile(
   maxDim = 1600,
   quality = 0.82
 ): Promise<{ blob: Blob; ext: string }> {
+  const fallbackExt = file.name.includes('.') ? file.name.split('.').pop()!.toLowerCase() : 'jpg';
   if (file.type === 'image/gif' || typeof document === 'undefined' || typeof URL.createObjectURL !== 'function') {
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-    return { blob: file, ext };
+    return { blob: file, ext: fallbackExt };
   }
 
   const objectUrl = URL.createObjectURL(file);
@@ -85,7 +95,7 @@ export async function compressImageFile(
     canvas.height = height;
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      return { blob: file, ext: 'jpg' };
+      return { blob: file, ext: fallbackExt };
     }
     ctx.drawImage(img, 0, 0, width, height);
 
@@ -101,16 +111,27 @@ export async function compressImageFile(
     );
     return { blob: jpegBlob || file, ext: 'jpg' };
   } catch {
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-    return { blob: file, ext };
+    return { blob: file, ext: fallbackExt };
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
 }
 
+async function readBlobBytes(blob: Blob): Promise<Uint8Array> {
+  if (typeof blob.arrayBuffer === 'function') {
+    return new Uint8Array(await blob.arrayBuffer());
+  }
+  const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(new Error('Không thể đọc dữ liệu tệp.'));
+    reader.readAsArrayBuffer(blob);
+  });
+  return new Uint8Array(buffer);
+}
+
 export async function blobToBase64(blob: Blob): Promise<string> {
-  const buffer = await blob.arrayBuffer();
-  const bytes = new Uint8Array(buffer);
+  const bytes = await readBlobBytes(blob);
   const chunkSize = 0x8000;
   let binary = '';
   for (let i = 0; i < bytes.length; i += chunkSize) {

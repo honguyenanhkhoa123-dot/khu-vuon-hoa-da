@@ -6,6 +6,7 @@ import type {
   SiteSettings
 } from '../types/zine';
 import {
+  GitHubAuthError,
   readJsonFile,
   updateJsonFileWithRetry,
   uploadBinaryFile,
@@ -37,6 +38,22 @@ function makeId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${rand}`;
 }
 
+function safeLocalStorageSet(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function makePreviewUrl(blob: Blob): Promise<string> {
+  if (typeof URL.createObjectURL === 'function') {
+    return URL.createObjectURL(blob);
+  }
+  return blobToDataUrl(blob);
+}
+
 async function fetchStaticJson<T>(relativePath: string): Promise<T> {
   const res = await fetch(relativePath, { cache: 'no-cache' });
   if (!res.ok) {
@@ -47,7 +64,7 @@ async function fetchStaticJson<T>(relativePath: string): Promise<T> {
 
 export async function loadInitialData(
   session: AuthSession | null
-): Promise<{ site: SiteSettings; posts: Post[] }> {
+): Promise<{ site: SiteSettings; posts: Post[]; authExpired?: boolean }> {
   const [staticSite, staticPosts] = await Promise.all([
     fetchStaticJson<SiteSettings>('./data/site.json'),
     fetchStaticJson<Post[]>('./data/posts.json')
@@ -57,11 +74,14 @@ export async function loadInitialData(
     try {
       const cfg = repoConfigOf(staticSite);
       const [ghSite, ghPosts] = await Promise.all([
-        readJsonFile<SiteSettings>(cfg, session.token, 'public/data/site.json'),
-        readJsonFile<Post[]>(cfg, session.token, 'public/data/posts.json')
+        readJsonFile<SiteSettings>(cfg, session.token, 'docs/data/site.json'),
+        readJsonFile<Post[]>(cfg, session.token, 'docs/data/posts.json')
       ]);
       return { site: ghSite.data, posts: ghPosts.data };
-    } catch {
+    } catch (err) {
+      if (err instanceof GitHubAuthError) {
+        return { site: staticSite, posts: staticPosts, authExpired: true };
+      }
       return { site: staticSite, posts: staticPosts };
     }
   }
@@ -82,7 +102,8 @@ export async function createPost(
   input: DraftPostInput,
   site: SiteSettings,
   session: AuthSession,
-  onProgress?: (pct: number) => void
+  onProgress?: (pct: number) => void,
+  onPreviewUrl?: (repoRelUrl: string, localPreviewUrl: string) => void
 ): Promise<Post[]> {
   const now = new Date();
   const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -101,40 +122,45 @@ export async function createPost(
 
     if (session.mode === 'github' && session.token) {
       const cfg = repoConfigOf(site);
-      let base64: string;
+      let uploadBlob: Blob;
       let ext: string;
 
       if (isVid) {
-        ext = file.name.split('.').pop()?.toLowerCase() || 'mp4';
-        base64 = await blobToBase64(file);
+        ext = file.name.includes('.') ? file.name.split('.').pop()!.toLowerCase() : 'mp4';
+        uploadBlob = file;
       } else {
         const compressed = await compressImageFile(file);
         ext = compressed.ext;
-        base64 = await blobToBase64(compressed.blob);
+        uploadBlob = compressed.blob;
       }
 
+      const base64 = await blobToBase64(uploadBlob);
       const relPath = `uploads/${ym}/${itemId}.${ext}`;
       await uploadBinaryFile(
         cfg,
         session.token,
-        `public/${relPath}`,
+        `docs/${relPath}`,
         base64,
         `media: upload ${itemId}.${ext} for Lop ${input.grade}`
       );
 
+      const relUrl = `./${relPath}`;
+      const localUrl = await makePreviewUrl(uploadBlob);
+      onPreviewUrl?.(relUrl, localUrl);
+
       mediaItems.push({
         id: itemId,
         type: isVid ? 'video' : 'image',
-        url: `./${relPath}`,
+        url: relUrl,
         alt: input.momentLabel || `Kỷ niệm Lớp ${input.grade}`
       });
     } else {
       const blob = isVid ? file : (await compressImageFile(file, 1080, 0.78)).blob;
-      const dataUrl = await blobToDataUrl(blob);
+      const url = isVid ? await makePreviewUrl(blob) : await blobToDataUrl(blob);
       mediaItems.push({
         id: itemId,
         type: isVid ? 'video' : 'image',
-        url: dataUrl,
+        url,
         alt: input.momentLabel || `Kỷ niệm Lớp ${input.grade}`
       });
     }
@@ -158,7 +184,7 @@ export async function createPost(
     const updated = await updateJsonFileWithRetry<Post[]>(
       repoConfigOf(site),
       session.token,
-      'public/data/posts.json',
+      'docs/data/posts.json',
       (list) => [newPost, ...list],
       `feat: add Lop ${input.grade} post by ${newPost.authorName}`
     );
@@ -171,7 +197,7 @@ export async function createPost(
     ? (JSON.parse(existingRaw) as Post[])
     : await fetchStaticJson<Post[]>('./data/posts.json');
   const next = [newPost, ...existing];
-  localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(next));
+  safeLocalStorageSet(LOCAL_POSTS_KEY, JSON.stringify(next));
   tick();
   return next;
 }
@@ -193,7 +219,7 @@ export async function updatePostAdmin(
     return updateJsonFileWithRetry<Post[]>(
       repoConfigOf(site),
       session.token,
-      'public/data/posts.json',
+      'docs/data/posts.json',
       applyPatch,
       `admin: update post ${postId}`
     );
@@ -204,7 +230,7 @@ export async function updatePostAdmin(
     ? (JSON.parse(existingRaw) as Post[])
     : await fetchStaticJson<Post[]>('./data/posts.json');
   const next = applyPatch(existing);
-  localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(next));
+  safeLocalStorageSet(LOCAL_POSTS_KEY, JSON.stringify(next));
   return next;
 }
 
@@ -223,7 +249,7 @@ export async function deletePostAdmin(
     return updateJsonFileWithRetry<Post[]>(
       repoConfigOf(site),
       session.token,
-      'public/data/posts.json',
+      'docs/data/posts.json',
       remove,
       `admin: delete post ${postId}`
     );
@@ -234,7 +260,7 @@ export async function deletePostAdmin(
     ? (JSON.parse(existingRaw) as Post[])
     : await fetchStaticJson<Post[]>('./data/posts.json');
   const next = remove(existing);
-  localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(next));
+  safeLocalStorageSet(LOCAL_POSTS_KEY, JSON.stringify(next));
   return next;
 }
 
@@ -242,13 +268,14 @@ export async function updateSiteSettingsAdmin(
   patch: Partial<Pick<SiteSettings, 'heroImage' | 'heroCaption' | 'adminPasscodeHash'>>,
   site: SiteSettings,
   session: AuthSession,
-  heroFile?: File
+  heroFile?: File,
+  onPreviewUrl?: (repoRelUrl: string, localPreviewUrl: string) => void
 ): Promise<SiteSettings> {
   if (session.role !== 'admin') {
     throw new Error('Chỉ Admin mới có quyền thay đổi cài đặt trang.');
   }
 
-  let nextHeroImage = patch.heroImage ?? site.heroImage;
+  let uploadedHeroUrl: string | undefined;
 
   if (heroFile) {
     const compressed = await compressImageFile(heroFile, 1800, 0.85);
@@ -259,34 +286,35 @@ export async function updateSiteSettingsAdmin(
       await uploadBinaryFile(
         repoConfigOf(site),
         session.token,
-        `public/${relPath}`,
+        `docs/${relPath}`,
         base64,
         `admin: upload hero cover ${heroId}`
       );
-      nextHeroImage = `./${relPath}`;
+      uploadedHeroUrl = `./${relPath}`;
+      onPreviewUrl?.(uploadedHeroUrl, await makePreviewUrl(compressed.blob));
     } else {
-      nextHeroImage = await blobToDataUrl(compressed.blob);
+      uploadedHeroUrl = await blobToDataUrl(compressed.blob);
     }
   }
 
   const applyPatch = (cur: SiteSettings): SiteSettings => ({
     ...cur,
     ...patch,
-    heroImage: nextHeroImage
+    heroImage: uploadedHeroUrl ?? patch.heroImage ?? cur.heroImage
   });
 
   if (session.mode === 'github' && session.token) {
     return updateJsonFileWithRetry<SiteSettings>(
       repoConfigOf(site),
       session.token,
-      'public/data/site.json',
+      'docs/data/site.json',
       applyPatch,
       'admin: update site settings'
     );
   }
 
   const next = applyPatch(site);
-  localStorage.setItem(LOCAL_SITE_KEY, JSON.stringify(next));
+  safeLocalStorageSet(LOCAL_SITE_KEY, JSON.stringify(next));
   return next;
 }
 
