@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="960" height="600">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="55%" stop-color="#334155"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M 32 0 L 0 0 0 32" fill="none" stroke="rgba(247,243,234,0.08)" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="960" height="600" fill="url(#bg)"/>
+  <rect width="960" height="600" fill="url(#grid)"/>
+  <g transform="translate(720 170)" stroke="#d9f99d" stroke-opacity="0.45" fill="none" stroke-width="2">
+    <polygon points="0,-90 78,-45 78,45 0,90 -78,45 -78,-45"/>
+    <circle cx="0" cy="0" r="46" stroke-dasharray="10 6"/>
+    <line x1="-170" y1="0" x2="-92" y2="0"/>
+    <line x1="92" y1="0" x2="170" y2="0"/>
+  </g>
+  <rect x="64" y="64" width="176" height="32" rx="4" fill="#d9f99d"/>
+  <text x="82" y="85" font-family="monospace" font-size="14" font-weight="700" fill="#171717" letter-spacing="1.5">12 CHUYÊN HÓA</text>
+  <text x="64" y="420" font-family="Georgia, serif" font-style="italic" font-size="56" fill="#f7f3ea">Khu vườn hóa đá</text>
+  <text x="64" y="468" font-family="sans-serif" font-size="22" fill="rgba(247,243,234,0.8)">Ảnh tập thể lớp có thể thay trực tiếp trong chế độ Admin</text>
+  <text x="64" y="532" font-family="monospace" font-size="14" fill="rgba(247,243,234,0.55)" letter-spacing="2">NIÊN KHÓA 2023 — 2026 · LƯU TRỮ KỶ NIỆM</text>
+</svg>

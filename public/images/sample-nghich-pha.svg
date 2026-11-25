@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 540" width="800" height="540">
+  <rect width="800" height="540" fill="#fde68a"/>
+  <rect x="28" y="28" width="744" height="484" fill="none" stroke="#171717" stroke-width="2.5" stroke-dasharray="10 8"/>
+  <text x="56" y="96" font-family="monospace" font-size="16" font-weight="700" fill="#b91c1c" letter-spacing="2">HỒ SƠ NGHỊCH PHÁ · LỚP 12</text>
+  <text x="56" y="392" font-family="Georgia, serif" font-style="italic" font-size="44" fill="#171717">Hiện trường tổ 3 ngủ gật</text>
+  <text x="56" y="440" font-family="monospace" font-size="15" fill="#404040">ẢNH MẪU CÓ CHẾ ĐỘ BÓC NIÊM PHONG</text>
+</svg>
