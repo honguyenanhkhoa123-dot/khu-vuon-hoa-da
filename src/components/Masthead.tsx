@@ -1,11 +1,30 @@
+import { useRef } from 'react';
 import { motion } from 'framer-motion';
 
 interface MastheadProps {
   title: string;
   cohort: string;
+  onSecretTrigger?: () => void;
 }
 
-export function Masthead({ title, cohort }: MastheadProps) {
+const REQUIRED_TAPS = 5;
+const TAP_WINDOW_MS = 4000;
+
+export function Masthead({ title, cohort, onSecretTrigger }: MastheadProps) {
+  const tapTimestamps = useRef<number[]>([]);
+
+  function handleMetaClick() {
+    if (!onSecretTrigger) return;
+    const now = Date.now();
+    const recent = tapTimestamps.current.filter((t) => now - t <= TAP_WINDOW_MS);
+    recent.push(now);
+    tapTimestamps.current = recent;
+    if (recent.length >= REQUIRED_TAPS) {
+      tapTimestamps.current = [];
+      onSecretTrigger();
+    }
+  }
+
   return (
     <motion.header
       className="masthead"
@@ -17,7 +36,13 @@ export function Masthead({ title, cohort }: MastheadProps) {
         <span className="masthead-title">{title}</span>
         <span className="masthead-sub">12 Chuyên Hóa</span>
       </div>
-      <div className="masthead-meta">NIÊN KHÓA {cohort}</div>
+      <div
+        className="masthead-meta"
+        style={{ userSelect: 'none' }}
+        onClick={handleMetaClick}
+      >
+        NIÊN KHÓA {cohort}
+      </div>
     </motion.header>
   );
 }

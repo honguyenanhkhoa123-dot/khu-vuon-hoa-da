@@ -24,6 +24,7 @@ import { GradeTabs, type TagFilter } from './components/GradeTabs';
 import { PostCard } from './components/PostCard';
 import { LightboxModal } from './components/LightboxModal';
 import { SecretPortal } from './components/SecretPortal';
+import { QuickUnlockModal } from './components/QuickUnlockModal';
 import { PostComposerModal } from './components/PostComposerModal';
 import { AdminSettingsModal } from './components/AdminSettingsModal';
 
@@ -32,7 +33,7 @@ const SECRET_HASH = '#/cong-bien-tap';
 
 function readStoredSession(): AuthSession | null {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
+    const raw = localStorage.getItem(SESSION_KEY) ?? sessionStorage.getItem(SESSION_KEY);
     return raw ? (JSON.parse(raw) as AuthSession) : null;
   } catch {
     return null;
@@ -56,6 +57,7 @@ export function App() {
     caption: string;
   } | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [quickUnlockOpen, setQuickUnlockOpen] = useState(false);
   const [adminModal, setAdminModal] = useState<{ open: boolean; post: Post | null }>({
     open: false,
     post: null
@@ -79,8 +81,18 @@ export function App() {
     function onHashChange() {
       setHash(window.location.hash);
     }
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setQuickUnlockOpen(true);
+      }
+    }
     window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('hashchange', onHashChange);
+      window.removeEventListener('keydown', onKeyDown);
+    };
   }, []);
 
   useEffect(() => {
@@ -93,6 +105,7 @@ export function App() {
         setSite(res.site);
         setPosts(res.posts);
         if (res.authExpired) {
+          localStorage.removeItem(SESSION_KEY);
           sessionStorage.removeItem(SESSION_KEY);
           setSession(null);
         }
@@ -145,13 +158,25 @@ export function App() {
     [visiblePosts, activeGrade, activeTag]
   );
 
-  function saveSession(next: AuthSession | null) {
+  function saveSession(next: AuthSession | null, remember = true) {
     setSession(next);
     if (next) {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(next));
+      const serialized = JSON.stringify(next);
+      if (remember) {
+        try {
+          localStorage.setItem(SESSION_KEY, serialized);
+        } catch {
+          sessionStorage.setItem(SESSION_KEY, serialized);
+        }
+        sessionStorage.removeItem(SESSION_KEY);
+      } else {
+        sessionStorage.setItem(SESSION_KEY, serialized);
+        localStorage.removeItem(SESSION_KEY);
+      }
       window.location.hash = '';
       setHash('');
     } else {
+      localStorage.removeItem(SESSION_KEY);
       sessionStorage.removeItem(SESSION_KEY);
       setBanner(null);
     }
@@ -223,7 +248,12 @@ export function App() {
   }
 
   async function handleUpdateSite(
-    patch: Partial<Pick<SiteSettings, 'heroImage' | 'heroCaption' | 'adminPasscodeHash'>>,
+    patch: Partial<
+      Pick<
+        SiteSettings,
+        'heroImage' | 'heroCaption' | 'adminPasscodeHash' | 'editorVault' | 'adminVault'
+      >
+    >,
     heroFile?: File
   ) {
     if (!site || !session) return;
@@ -320,7 +350,11 @@ export function App() {
       )}
 
       <main className="zine-page">
-        <Masthead title={site.title} cohort={site.cohort} />
+        <Masthead
+          title={site.title}
+          cohort={site.cohort}
+          onSecretTrigger={() => setQuickUnlockOpen(true)}
+        />
         <HeroCover site={resolvedSite || site} />
 
         {banner && session && (
@@ -408,10 +442,31 @@ export function App() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {quickUnlockOpen && !session && (
+          <QuickUnlockModal
+            site={site}
+            onUnlocked={(nextSession, remember, updatedSite) => {
+              if (updatedSite) setSite(updatedSite);
+              saveSession(nextSession, remember);
+              setQuickUnlockOpen(false);
+              if (updatedSite) {
+                showNotice(
+                  'Đã mã hóa & kích hoạt mã ngắn lên GitHub — từ sau chỉ cần chạm 5 lần và nhập 1 mật mã.'
+                );
+              }
+            }}
+            onClose={() => setQuickUnlockOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {adminModal.open && session?.role === 'admin' && (
           <AdminSettingsModal
+            key={adminModal.post?.id ?? 'site'}
             site={site}
             storageMode={session.mode}
+            activeToken={session.token}
             editingPost={adminModal.post}
             onUpdatePost={handleUpdatePost}
             onDeletePost={handleDeletePost}

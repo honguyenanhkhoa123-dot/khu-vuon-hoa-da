@@ -1,12 +1,13 @@
 import { useState, type FormEvent } from 'react';
 import { motion } from 'framer-motion';
 import type { Grade, MediaItem, Post, PostTag, SiteSettings, StorageMode } from '../types/zine';
-import { sha256Hex, verifyPasscode } from '../lib/crypto';
+import { encryptSecretWithPasscode, sha256Hex, verifyPasscode } from '../lib/crypto';
 import { validateHeroImageFile } from '../lib/media';
 
 interface AdminSettingsModalProps {
   site: SiteSettings;
   storageMode: StorageMode;
+  activeToken?: string;
   editingPost: Post | null;
   onUpdatePost: (
     postId: string,
@@ -14,7 +15,12 @@ interface AdminSettingsModalProps {
   ) => Promise<void>;
   onDeletePost: (postId: string) => Promise<void>;
   onUpdateSite: (
-    patch: Partial<Pick<SiteSettings, 'heroImage' | 'heroCaption' | 'adminPasscodeHash'>>,
+    patch: Partial<
+      Pick<
+        SiteSettings,
+        'heroImage' | 'heroCaption' | 'adminPasscodeHash' | 'editorVault' | 'adminVault'
+      >
+    >,
     heroFile?: File
   ) => Promise<void>;
   onResetLocal?: () => void;
@@ -26,6 +32,7 @@ const TAGS: PostTag[] = ['Ảnh lớp', 'Sự kiện', 'Điểm đồ', 'Nghịc
 export function AdminSettingsModal({
   site,
   storageMode,
+  activeToken,
   editingPost,
   onUpdatePost,
   onDeletePost,
@@ -46,6 +53,8 @@ export function AdminSettingsModal({
   const [heroFile, setHeroFile] = useState<File | undefined>(undefined);
   const [currentPass, setCurrentPass] = useState('');
   const [newPass, setNewPass] = useState('');
+  const [newEditorPass, setNewEditorPass] = useState('');
+  const [replacementToken, setReplacementToken] = useState('');
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,13 +96,30 @@ export function AdminSettingsModal({
     e.preventDefault();
     setError(null);
 
-    const patch: Partial<Pick<SiteSettings, 'heroImage' | 'heroCaption' | 'adminPasscodeHash'>> = {
+    const patch: Partial<
+      Pick<
+        SiteSettings,
+        'heroImage' | 'heroCaption' | 'adminPasscodeHash' | 'editorVault' | 'adminVault'
+      >
+    > = {
       heroCaption: heroCaption.trim() || site.heroCaption
     };
 
-    if (newPass.trim()) {
-      if (newPass.trim().length < 6) {
+    const tokenForVault = replacementToken.trim() || activeToken;
+    const cleanNewAdmin = newPass.trim();
+    const cleanNewEditor = newEditorPass.trim();
+
+    if (cleanNewAdmin || cleanNewEditor) {
+      if (cleanNewAdmin && cleanNewAdmin.length < 6) {
         setError('Mã Admin mới cần ít nhất 6 ký tự.');
+        return;
+      }
+      if (cleanNewEditor && cleanNewEditor.length < 6) {
+        setError('Mã Biên tập viên mới cần ít nhất 6 ký tự.');
+        return;
+      }
+      if (cleanNewAdmin && cleanNewEditor && cleanNewAdmin === cleanNewEditor) {
+        setError('Mã Biên tập viên và Mã Admin phải khác nhau.');
         return;
       }
       const okOld = await verifyPasscode(currentPass, site.adminPasscodeHash);
@@ -101,7 +127,19 @@ export function AdminSettingsModal({
         setError('Mã Admin hiện tại không đúng.');
         return;
       }
-      patch.adminPasscodeHash = await sha256Hex(newPass.trim());
+      if (cleanNewAdmin) {
+        patch.adminPasscodeHash = await sha256Hex(cleanNewAdmin);
+        if (tokenForVault) {
+          patch.adminVault = await encryptSecretWithPasscode(tokenForVault, cleanNewAdmin);
+        }
+      }
+      if (cleanNewEditor) {
+        if (!tokenForVault) {
+          setError('Cần kết nối GitHub Token để tạo mã Biên tập viên nhanh.');
+          return;
+        }
+        patch.editorVault = await encryptSecretWithPasscode(tokenForVault, cleanNewEditor);
+      }
     }
 
     setBusy(true);
@@ -313,7 +351,7 @@ export function AdminSettingsModal({
                   id="admin-old-pass"
                   type="password"
                   className="field-input"
-                  placeholder="Chỉ điền khi muốn đổi mã"
+                  placeholder="Điền khi muốn đổi mã"
                   value={currentPass}
                   onChange={(e) => setCurrentPass(e.target.value)}
                 />
@@ -330,6 +368,36 @@ export function AdminSettingsModal({
                   placeholder="Ít nhất 6 ký tự"
                   value={newPass}
                   onChange={(e) => setNewPass(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="field-grid" style={{ marginTop: '10px' }}>
+              <div className="field-group" style={{ marginBottom: 0 }}>
+                <label className="field-label" htmlFor="admin-new-editor-pass">
+                  Mã Biên tập viên mới (tùy chọn)
+                </label>
+                <input
+                  id="admin-new-editor-pass"
+                  type="password"
+                  className="field-input"
+                  placeholder="Ít nhất 6 ký tự"
+                  value={newEditorPass}
+                  onChange={(e) => setNewEditorPass(e.target.value)}
+                />
+              </div>
+
+              <div className="field-group" style={{ marginBottom: 0 }}>
+                <label className="field-label" htmlFor="admin-replace-token">
+                  Đổi GitHub Token (tùy chọn)
+                </label>
+                <input
+                  id="admin-replace-token"
+                  type="password"
+                  className="field-input"
+                  placeholder="Để trống nếu giữ Token hiện tại"
+                  value={replacementToken}
+                  onChange={(e) => setReplacementToken(e.target.value)}
                 />
               </div>
             </div>

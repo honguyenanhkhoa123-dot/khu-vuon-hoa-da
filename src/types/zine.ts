@@ -30,6 +30,13 @@ export interface Post {
   media: MediaItem[];
 }
 
+export interface EncryptedVault {
+  salt: string;
+  iv: string;
+  ciphertext: string;
+  iterations: number;
+}
+
 export interface SiteSettings {
   title: string;
   subtitle: string;
@@ -40,6 +47,8 @@ export interface SiteSettings {
   repoName: string;
   repoBranch: string;
   adminPasscodeHash: string;
+  editorVault?: EncryptedVault;
+  adminVault?: EncryptedVault;
 }
 
 export type AuthRole = 'public' | 'editor' | 'admin';

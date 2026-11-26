@@ -10,8 +10,10 @@ import {
   readJsonFile,
   updateJsonFileWithRetry,
   uploadBinaryFile,
+  verifyRepoToken,
   type RepoConfig
 } from './githubApi';
+import { encryptSecretWithPasscode, sha256Hex } from './crypto';
 import {
   blobToBase64,
   blobToDataUrl,
@@ -265,7 +267,12 @@ export async function deletePostAdmin(
 }
 
 export async function updateSiteSettingsAdmin(
-  patch: Partial<Pick<SiteSettings, 'heroImage' | 'heroCaption' | 'adminPasscodeHash'>>,
+  patch: Partial<
+    Pick<
+      SiteSettings,
+      'heroImage' | 'heroCaption' | 'adminPasscodeHash' | 'editorVault' | 'adminVault'
+    >
+  >,
   site: SiteSettings,
   session: AuthSession,
   heroFile?: File,
@@ -316,6 +323,57 @@ export async function updateSiteSettingsAdmin(
   const next = applyPatch(site);
   safeLocalStorageSet(LOCAL_SITE_KEY, JSON.stringify(next));
   return next;
+}
+
+export async function setupQuickAccessVaults(
+  site: SiteSettings,
+  token: string,
+  editorPasscode: string,
+  adminPasscode: string
+): Promise<{ site: SiteSettings; session: AuthSession }> {
+  const cleanEditor = editorPasscode.trim();
+  const cleanAdmin = adminPasscode.trim();
+  if (cleanEditor.length < 6 || cleanAdmin.length < 6) {
+    throw new Error('Mã Biên tập viên và Mã Admin cần ít nhất 6 ký tự.');
+  }
+  if (cleanEditor === cleanAdmin) {
+    throw new Error('Mã Biên tập viên và Mã Admin phải khác nhau.');
+  }
+
+  const cfg = repoConfigOf(site);
+  const check = await verifyRepoToken(cfg, token);
+  if (!check.ok) {
+    throw new Error(check.error || 'Token GitHub không hợp lệ.');
+  }
+
+  const [editorVault, adminVault, adminPasscodeHash] = await Promise.all([
+    encryptSecretWithPasscode(token.trim(), cleanEditor),
+    encryptSecretWithPasscode(token.trim(), cleanAdmin),
+    sha256Hex(cleanAdmin)
+  ]);
+
+  const updatedSite = await updateJsonFileWithRetry<SiteSettings>(
+    cfg,
+    token.trim(),
+    'docs/data/site.json',
+    (cur) => ({
+      ...cur,
+      editorVault,
+      adminVault,
+      adminPasscodeHash
+    }),
+    'admin: configure quick-access encrypted passcodes'
+  );
+
+  return {
+    site: updatedSite,
+    session: {
+      role: 'admin',
+      mode: 'github',
+      token: token.trim(),
+      githubLogin: check.login
+    }
+  };
 }
 
 export function clearLocalPreviewData(): void {
