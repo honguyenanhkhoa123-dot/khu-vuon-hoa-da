@@ -7,5 +7,17 @@
   "repoOwner": "honguyenanhkhoa123-dot",
   "repoName": "khu-vuon-hoa-da",
   "repoBranch": "main",
-  "adminPasscodeHash": "65975636671d8bf827fb7d52323ff4528324f23c48d6a27ed0cc89aba2d2ad5f"
+  "adminPasscodeHash": "65975636671d8bf827fb7d52323ff4528324f23c48d6a27ed0cc89aba2d2ad5f",
+  "editorVault": {
+    "salt": "tcurV3x3/fcIhvupEYJ+DQ==",
+    "iv": "aaSnwL7fN9ASV+y3",
+    "ciphertext": "mAhd8RPPT/KxZb9mT5iET0xFPrwjgJ0Wg7QCpf8y5ODFN4hhCiD7ZfSW+KMzui/FReV0l1E5vqlDSO1JR7HhBKHibz53rD4gm/BO9X9Nj2oA3YikrHWY30+SAs/KQ2BxtGpnfLJ/mxoflxX7FQ==",
+    "iterations": 150000
+  },
+  "adminVault": {
+    "salt": "jyGJbdHNDeyar4nsvc9S2w==",
+    "iv": "l21n+fbl7iU9Sd5g",
+    "ciphertext": "4Ma3F2V/vTZHdDfnRAIwac9x5SxZsIqs6OiDr/k/T8y71+hyglXamhLRxvlTiymcYf7D7fLGkNl1j2TfSR93LP7W4d49tD51mdNC5BKJw0PMCeEPS67GbRs38j3EpWDT8SIWTHwKAWsqE7yuTA==",
+    "iterations": 150000
+  }
 }
